@@ -1,0 +1,170 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject FetchUserData fetchUserData
+@inject UserAccount userAccount
+@inject UserToken userToken
+@inject ThemeStateService ThemeState
+@implements IDisposable
+@using DnD35v3.Modules
+
+<MudThemeProvider @bind-IsDarkMode="@ThemeState.IsDarkMode" Theme="setTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Color="Color.Primary">
+         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+         <MudSpacer />
+         <AuthorizeView>
+
+             <Authorized>
+                @WelcomeMessage
+             </Authorized>
+
+         </AuthorizeView>
+        <MudSpacer />
+         <AuthorizeView>
+            <Authorized>
+                <MudButton Color="Color.Inherit" OnClick="@((e) => LogOut())">LOGOUT</MudButton>
+            </Authorized>
+
+            <NotAuthorized>
+                 <MudButton Color="Color.Inherit" OnClick="@((e) => LogIn())">LOGIN</MudButton>
+            </NotAuthorized>
+         </AuthorizeView>
+      
+
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="@DrawerVariant.Responsive" Anchor="Anchor.Left">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6">Menu</MudText>
+        </MudDrawerHeader>
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+
+
+
+@code {
+    bool _drawerOpen = true;
+    public MudTheme setTheme = new MudTheme()
+        {
+            Palette = new Palette()
+            {
+                Primary = "#30231A",
+                Secondary = "#6d4c41",
+                Tertiary = "#546e7a",
+                Info = "#1e88e5",
+                Success = "#2e7d32",
+                Warning = "#f9a825",
+                Error = "#d32f2f",
+                Dark = "#3e2723",
+                Background = "#fafafa",
+                BackgroundGrey = "#eeeeee",
+                Surface = "#ffffff",
+                DrawerBackground = "rgba(218, 205, 196,0.5)",
+                DrawerText = "rgba(78,52,46,0.9)",
+                DrawerIcon = "rgba(78,52,46,0.7)",
+                AppbarBackground = "#4e342e",
+                AppbarText = "#ffffff",
+                TextPrimary = "rgba(78,52,46,0.87)",
+                TextSecondary = "rgba(78,52,46,0.54)",
+                ActionDefault = "#4e342e",
+                ActionDisabled = "rgba(78,52,46,0.26)",
+                ActionDisabledBackground = "rgba(78,52,46,0.12)"
+            },
+            PaletteDark = new Palette()
+            {
+                Primary = "#383838", // Dark grey
+                Secondary = "#616161", // Medium-dark grey
+                Tertiary = "#757575", // Lighter grey
+                Info = "#2196f3", // Bright blue for information
+                Success = "#388e3c", // Green for success messages
+                Warning = "#ff9800", // Orange for warnings
+                Error = "#f44336", // Red for errors
+                Dark = "#212121", // Very dark grey, almost black
+                Background = "#121212", // Near black background
+                BackgroundGrey = "#1e1e1e",
+                Surface = "#333333", // Dark surface color
+                DrawerBackground = "#1e1e1e",
+                DrawerText = "rgba(255,255,255,0.7)", // Light text for drawer
+                DrawerIcon = "rgba(255,255,255,0.7)", // Light icon color       
+                
+                AppbarBackground = "#2c2c2c", // Dark grey for app bar
+                AppbarText = "#ffffff", // White text for contrast
+                TextPrimary = "rgba(255,255,255,0.87)", // Primary text color, bright for readability
+                TextSecondary = "rgba(255,255,255,0.54)", // Secondary text color, less bright
+                ActionDefault = "#4e342e", // Default action color, can be a muted tone
+                ActionDisabled = "rgba(255,255,255,0.26)", // Disabled action, pale
+                ActionDisabledBackground = "rgba(255,255,255,0.12)" // Disabled action background, very pale
+            
+            }
+        };
+    protected override void OnInitialized()
+    {
+        ThemeState.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        ThemeState.OnChange -= StateHasChanged;
+    }
+
+
+    string UserName { get; set; } = string.Empty;
+    string WelcomeMessage { get; set; } = string.Empty;
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private void LogIn()
+    {
+
+        NavigationManager.NavigateTo("login?redirectUri=/", forceLoad: true);
+
+    }
+
+    private void LogOut()
+    {
+        NavigationManager.NavigateTo("logout", forceLoad: true);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshUserData();
+    }
+
+    private async Task RefreshUserData()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            string authID = user.FindFirst(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))?.Value;
+
+            await fetchUserData.FetchUser(authID);
+
+            if (userAccount.Account_name == null)
+            {
+                WelcomeMessage = "Please setup your account.";
+            }
+            else
+            {
+                UserName = userAccount.Account_name;
+                WelcomeMessage = $"Logged in as {UserName}";
+         
+                ThemeState.IsDarkMode = userAccount.IsDarkMode;
+            }
+        }
+    }
+}

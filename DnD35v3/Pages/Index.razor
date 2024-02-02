@@ -1,0 +1,103 @@
+﻿@page "/"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserAccount userAccount
+@inject FetchUserList userList
+@inject FetchUserData fetchUserData
+@inject NavigationManager NavigationManager
+@using DnD35v3.Modules
+@using DnD35v3.Pages
+
+<PageTitle>Home Page</PageTitle>
+<br />
+
+<MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center">Welcome to Troll Vault's DnD35 app!</MudText>
+<br />
+
+<MudPaper Height="100%" Width="100%">
+    <br />
+    <MudContainer MaxWidth="MaxWidth.Large">
+
+        <AuthorizeView>
+
+                <Authorized>
+
+                @if (IsNewAccount)
+                {
+                 <CreateAccount />
+
+                } else
+                {
+                    <MudText Style="padding-bottom: 20px">Hello, @UserAccountName</MudText>
+
+                    <MudText Style="padding-bottom: 20px">This app is a work in progress. Not everything will work as expected.</MudText>
+                }
+
+                 
+
+
+                </Authorized>
+
+                <NotAuthorized>
+
+                    <MudText Style="padding-bottom: 20px">Please Login to continue.</MudText>
+
+
+                </NotAuthorized>
+
+            </AuthorizeView>
+
+    </MudContainer>
+
+  
+</MudPaper>
+
+
+
+
+
+
+
+    @code {
+    [Parameter]
+    public int UserID { get; set; }
+    public string? UserAccountName { get; set; }
+    public bool IsNewAccount { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshUserData();
+        await Task.Run(() =>
+         {       
+             UserID = userAccount.ID;
+             UserAccountName = userAccount.Account_name;
+
+             if (UserAccountName is null)
+             {
+                 IsNewAccount = true;
+             } else
+             {
+                 IsNewAccount = false;
+             }
+                  
+         });
+
+    
+
+    }
+
+    private async Task RefreshUserData()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            string authID = user.FindFirst(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))?.Value;
+
+
+            await fetchUserData.FetchUser(authID);
+
+
+        }
+    }
+}

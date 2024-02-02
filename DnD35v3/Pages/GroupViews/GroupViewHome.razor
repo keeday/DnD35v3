@@ -1,0 +1,105 @@
+﻿@page "/group/{UrlGroupName}"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserAccount userAccount
+@inject FetchUserData fetchUserData
+@inject GroupHandler groupHandler
+
+<PageTitle>@UrlGroupName</PageTitle>
+<br />
+
+    <MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center">
+        @UrlGroupName</MudText>
+<br />
+
+<MudPaper Height="100%" Width="100%">
+    <br />
+    <MudContainer MaxWidth="MaxWidth.Large">
+
+        <AuthorizeView>
+
+            <Authorized>
+
+                @if (IsInvalidGroup)
+                {
+                    <MudText Style="padding-bottom: 20px">Could not find group '@UrlGroupName'</MudText>
+                    
+                } 
+                else 
+                {
+                     <MudText Style="padding-bottom: 20px">This is group @GroupName</MudText>
+                }
+
+               
+
+
+
+                 
+
+
+
+
+                </Authorized>
+
+                <NotAuthorized>
+
+                    <MudText Style="padding-bottom: 20px">Please Login to see this page.</MudText>
+
+
+                </NotAuthorized>
+
+            </AuthorizeView>
+
+        </MudContainer>
+
+
+    </MudPaper>
+
+    @code {
+    [Parameter]
+    public string UrlGroupName { get; set; } = string.Empty;
+    public int UserID { get; set; }
+    public string? UserAccountName { get; set; }
+
+    private DungeonGroups? group { get; set; }
+    public bool IsInvalidGroup {get; set; }
+
+    public string GroupName { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshUserData();
+
+        group = groupHandler.DungeonGroups.FirstOrDefault(u => u.Group_name == UrlGroupName);
+
+        if (group is null)
+        {
+            IsInvalidGroup = true;
+        } 
+        else
+        {
+            IsInvalidGroup = false;
+            GroupName = group.Group_name;
+        }
+
+        UserID = userAccount.ID;
+        UserAccountName = userAccount.Account_name;
+
+
+    }
+
+    private async Task RefreshUserData()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity!.IsAuthenticated)
+        {
+            string authID = user.FindFirst(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))?.Value!;
+
+
+            await fetchUserData.FetchUser(authID!);
+
+
+        }
+    }
+}

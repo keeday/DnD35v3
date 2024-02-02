@@ -1,0 +1,214 @@
+﻿@inject FetchUserData fetchUserData
+@inject UserAccount userAccount
+@inject UserToken userToken
+@inject FetchUserList userList
+@inject IJSRuntime JSRuntime
+@inject Validation validation
+@using System.Text.RegularExpressions
+@using DnD35v3.Modules
+@using System.ComponentModel.DataAnnotations
+
+<MudText Typo="Typo.h5" GutterBottom="true" Align="Align.Center" Style="padding: 10px">What will you be known as?</MudText>
+<br />
+
+@if (string.IsNullOrEmpty(UserValue))
+    {
+    <MudAlert Severity="Severity.Info">Please enter a account name below. (Between 3 and 20 characters, no special characters).</MudAlert>
+    }
+    else if(IsValidName)
+    {
+    <MudAlert Severity="Severity.Success">Account name is valid!</MudAlert>
+    } 
+    else
+    {
+        <MudAlert Severity="Severity.Error">@UserValueErrorMessage</MudAlert>
+    }
+
+ 
+    <MudTextField @bind-Value="UserValue" Label="Account Name"
+                  HelperText="Enter your desired account name"
+                  Variant="Variant.Text"
+                  Immediate="true"
+                  TextChanged="UsernameTextChanged" />
+
+
+              
+              <br />
+              <br />
+              <br />
+
+    @if (NoEmail)
+    {
+    <MudAlert Severity="Severity.Info">Email is Optional</MudAlert>
+    }
+    else
+    {
+        if (IsValidEmailCheck)
+        {
+        <MudAlert Severity="Severity.Success">Email is valid!</MudAlert>
+        } 
+        else
+        {
+        <MudAlert Severity="Severity.Error">@EmailValueErrorMessage</MudAlert>
+        }
+
+    }
+ 
+    
+            <MudTextField @bind-Value="EmailValue" Label="Email"
+                          HelperText="Add your email for newsletters."
+                          Variant="Variant.Text"
+                          Immediate="true"
+                          TextChanged="EmailTextChanged" />
+    
+  
+   
+
+
+<br />
+
+
+
+<div style="text-align: center;">
+    <MudButton Variant="Variant.Filled" Color="Color.Success" Style="margin: 15px;" OnClick="CreateUserButton" Disabled="@_processing">
+
+        @if (_processing)
+        {
+            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+            <MudText Class="ms-2">Processing</MudText>
+        }
+        else
+        {
+            <MudText>Create Account</MudText>
+        }
+
+
+    </MudButton>
+</div>
+
+      
+
+
+
+
+
+
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnAccountCreated { get; set; }
+    public string? EmailValue { get; set; }
+    public string UserValueErrorMessage { get; set; } = "Account name required.";
+    public string EmailValueErrorMessage { get; set; } = string.Empty;
+    public bool IsValidName { get; set; } = false;
+    public bool IsValidEmailCheck { get; set; }
+    public bool NoEmail { get; set; } = true;
+    public string UserValue { get; set; } = string.Empty;
+
+    public bool CB_Newsletter { get; set; } = false;
+
+    private bool _processing = false;
+
+    private async Task UsernameTextChanged(string newValue)
+    {
+        await Task.Run(() =>       
+        {
+            UserValue = newValue;
+            IsValidName = validation.IsValidUsername(UserValue);
+
+            if (!IsValidName)
+            {
+                UserValueErrorMessage = "Account name is Invalid. (Between 3 and 20 characters, no special characters.)";
+            }
+        }); 
+
+    }
+
+    private async Task EmailTextChanged(string newValue)
+    {
+        await Task.Run(() =>
+        {
+            if (string.IsNullOrWhiteSpace(newValue))
+            {
+                NoEmail = true;
+            } 
+            else
+            {
+                NoEmail = false;
+                EmailValue = newValue;
+                IsValidEmailCheck = validation.IsValidEmail(EmailValue);
+                if(!IsValidEmailCheck)
+                {
+                    EmailValueErrorMessage = "Email address is not valid.";
+                }
+            }
+
+
+        });
+
+    }
+
+    private async Task CreateUserButton()
+    {
+        _processing = true;
+        await Task.Delay(1000);
+        await Task.Run(() =>
+         {
+
+             if (IsValidName == false) 
+             { 
+
+                 return; 
+             }
+             if (userList.Users.Any(user => user.Account_name.Equals(UserValue, StringComparison.OrdinalIgnoreCase)))
+             {
+
+                 UserValueErrorMessage = "Account name already taken!";
+                 IsValidName = false;
+                 return;
+             }
+
+             if(NoEmail == false)
+             {
+                 if (userList.Users.Any(user => user.Email != null && user.Email.Equals(EmailValue, StringComparison.OrdinalIgnoreCase)))
+                 {
+                     EmailValueErrorMessage = "Email already exist!";
+                     IsValidEmailCheck = false;
+                     return;
+                 }
+             }
+
+         });
+
+        if(IsValidName) 
+        {
+
+
+            if (string.IsNullOrEmpty(EmailValue)) { EmailValue = null; }
+
+
+
+
+
+            if (NoEmail == false && IsValidEmailCheck == false)
+            {
+                _processing = false;
+                return;
+            } 
+            else
+            {
+                Console.WriteLine("NoEmail = " + NoEmail.ToString() + " IsValidEmailCheck: " + IsValidEmailCheck.ToString());
+                await fetchUserData.CreateUser(userToken.Token, UserValue, EmailValue!);
+                await JSRuntime.InvokeVoidAsync("location.reload");
+            }
+
+              
+                
+            }
+
+        _processing = false;
+       
+    }
+
+   
+}

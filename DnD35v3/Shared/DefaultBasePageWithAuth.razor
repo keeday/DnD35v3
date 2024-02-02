@@ -1,0 +1,72 @@
+﻿@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserAccount userAccount
+@inject FetchUserData fetchUserData
+
+<PageTitle>Page Title</PageTitle>
+<br />
+
+<MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center">Page Title</MudText>
+<br />
+
+<MudPaper Height="100%" Width="100%">
+    <br />
+    <MudContainer MaxWidth="MaxWidth.Large">
+
+        <AuthorizeView>
+
+                <Authorized>
+
+               
+                    <MudText Style="padding-bottom: 20px">Hello, @UserAccountName</MudText>
+
+                    <MudText Style="padding-bottom: 20px">Page Text</MudText>
+               
+                 
+
+
+                </Authorized>
+
+                <NotAuthorized>
+
+                    <MudText Style="padding-bottom: 20px">Please Login to see this page.</MudText>
+
+
+                </NotAuthorized>
+
+            </AuthorizeView>
+
+    </MudContainer>
+
+  
+</MudPaper>
+
+@code {
+    public int UserID { get; set; }
+    public string? UserAccountName { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshUserData();
+        
+             UserID = userAccount.ID;
+             UserAccountName = userAccount.Account_name;
+
+
+    }
+
+    private async Task RefreshUserData()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity!.IsAuthenticated)
+        {
+            string authID = user.FindFirst(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))?.Value!;
+
+
+            await fetchUserData.FetchUser(authID!);
+
+
+        }
+    }
+}

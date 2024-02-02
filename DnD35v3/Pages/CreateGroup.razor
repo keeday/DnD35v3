@@ -1,0 +1,226 @@
+﻿@page "/groups/create"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserAccount userAccount
+@inject FetchUserData fetchUserData
+@inject Validation validation
+@inject GroupHandler groupHandler
+@inject NavigationManager navigationManager
+
+
+
+<PageTitle>Create Group</PageTitle>
+<br />
+
+<MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center">Create Group</MudText>
+<br />
+
+<MudPaper Height="100%" Width="100%">
+    <br />
+    <MudContainer MaxWidth="MaxWidth.Large">
+
+        <AuthorizeView>
+
+            <Authorized>
+
+
+                <MudTextField @bind-Value="NewGroupName" 
+                                Label="Group Name" 
+                                HelperText="Enter a Group Name" 
+                                Variant="Variant.Text" 
+                                Immediate="true"
+                                Error="IsGroupNameValidError"
+                                ErrorText="@GroupNameErrorText"
+                              Disabled="ControlsDisabled"
+                                TextChanged="GroupNameChanged" />
+
+                <br />
+                <br />
+
+                <MudTextField @bind-Value="NewGroupDescription" 
+                Lines="1" 
+                Label="Group Description (Optional)" 
+                AutoGrow 
+                HelperText="@GroupDescriptionCharacterLimit"
+                               Disabled="ControlsDisabled"
+                Immediate="true"
+                               Error="MaxGroupDescriptionCharError"
+                               TextChanged="GroupDescriptionChanged"
+                               ErrorText="@GroupDescriptionCharacterLimit"
+                Variant="Variant.Text" />
+
+                <br />
+
+                <div style="text-align: center;">
+                     <MudButton Variant="Variant.Filled" Color="Color.Success" Style="margin: 15px" OnClick="CreateGroupButton" Disabled="@IsCreateGroupButtonDisabled">
+                         @if (_createGroupProcessing)
+                        {
+                              <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                <MudText Class="ms-2">Processing</MudText>
+                           
+                        } else
+                        {
+                            <MudText Class="ms-2">Create Group</MudText>
+                        }
+                     
+                     </MudButton>
+                </div>
+
+             
+
+                </Authorized>
+
+                <NotAuthorized>
+
+                    <MudText Style="padding-bottom: 20px">Please Login to see this page.</MudText>
+
+
+                </NotAuthorized>
+
+            </AuthorizeView>
+
+        </MudContainer>
+
+
+    </MudPaper>
+
+
+@code {
+    public int UserID { get; set; }
+    public string? UserAccountName { get; set; }
+    public string NewGroupName { get; set; } = string.Empty;
+    public string NewGroupDescription { get; set; } = string.Empty;
+
+    public bool IsGroupNameValid { get; set; }
+    public bool IsGroupNameValidError { get; set; }
+    public string GroupNameErrorText { get; set; } = string.Empty;
+    public int CurrentGroupDescriptionCharCount {get; set; } = 0;
+    public int MaxGroupDescriptionCharCount { get; set; } = 1000;
+    public string GroupDescriptionCharacterLimit { get; set; } = $"Character Limit: 0/0";
+    public bool MaxGroupDescriptionCharError { get; set; }
+
+    public bool IsCreateGroupButtonDisabled { get; set; }
+
+    public bool _createGroupProcessing {get; set; }
+
+    public bool ControlsDisabled {get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshUserData();
+
+        UserID = userAccount.ID;
+        UserAccountName = userAccount.Account_name;
+
+        GroupDescriptionCharacterLimit = $"Character Limit: {CurrentGroupDescriptionCharCount}/{MaxGroupDescriptionCharCount}";
+    }
+
+    private async Task RefreshUserData()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity!.IsAuthenticated)
+        {
+            string authID = user.FindFirst(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))?.Value!;
+
+
+            await fetchUserData.FetchUser(authID!);
+
+
+        }
+    }
+
+    private void GroupNameChanged(string newValue)
+    {
+        IsGroupNameValid =  validation.IsValidUsername(newValue);
+        IsGroupNameValidError = !IsGroupNameValid;
+
+
+        if (string.IsNullOrEmpty(newValue))
+        {
+            IsGroupNameValidError = false;
+        }
+        else if(newValue.Length < 3 || newValue.Length > 20)
+        {
+            GroupNameErrorText = "Group Name must be between 3 and 20 characters long.";
+        }
+        else if (!IsGroupNameValid)
+        {
+            GroupNameErrorText = "No special characters allowed.";
+        }
+        EnableDisableCreateGroupButton();
+    }
+
+    private void EnableDisableCreateGroupButton()
+    {
+        if (!IsGroupNameValid || MaxGroupDescriptionCharError)
+        {
+            IsCreateGroupButtonDisabled = true;
+        } else
+        {
+            IsCreateGroupButtonDisabled = false;
+        }
+    }
+
+    private void GroupDescriptionChanged(string newValue)
+    {
+        CurrentGroupDescriptionCharCount = newValue.Length;
+
+        if(CurrentGroupDescriptionCharCount > MaxGroupDescriptionCharCount)
+        {
+            MaxGroupDescriptionCharError = true;
+        } 
+        else
+        {
+            MaxGroupDescriptionCharError = false;
+        }
+
+        GroupDescriptionCharacterLimit = $"Character Limit: {CurrentGroupDescriptionCharCount}/{MaxGroupDescriptionCharCount}";
+        EnableDisableCreateGroupButton();
+    }
+
+    private async Task CreateGroupButton()
+    {
+        _createGroupProcessing = true;
+        ControlsDisabled = true;
+        IsCreateGroupButtonDisabled = true;
+
+        string trimedNewGroupName = NewGroupName.Trim();
+        string trimedNewGroupDescription = NewGroupDescription.Trim();
+
+        if (IsGroupNameValid && !MaxGroupDescriptionCharError)
+        {
+            if(groupHandler.DungeonGroups.Any(x => x.Group_name.ToLower() == trimedNewGroupName.ToLower()))
+			{
+				GroupNameErrorText = "Group Name already exists.";
+				IsGroupNameValidError = true;
+				ControlsDisabled = false;
+				IsCreateGroupButtonDisabled = false;
+				_createGroupProcessing = false;
+				return;
+			}
+
+            if(string.IsNullOrEmpty(NewGroupDescription))
+            {
+                await groupHandler.CreateGroup(trimedNewGroupName, null, UserID);
+            } 
+            else 
+            {
+                await groupHandler.CreateGroup(trimedNewGroupName, trimedNewGroupDescription, UserID);
+            }
+            await Task.Delay(500);
+
+             navigationManager.NavigateTo($"/group/{NewGroupName}");
+        }
+
+    
+
+     
+
+        _createGroupProcessing = false;
+        ControlsDisabled = false;
+        IsCreateGroupButtonDisabled = false;
+    }
+
+
+}

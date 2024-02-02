@@ -1,0 +1,525 @@
+﻿@page "/settings/user/{UrlAccountName}"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject GroupHandler groupService
+@inject UserAccount userAccount
+@inject FetchUserList userList
+@inject FetchUserData fetchUserData
+@inject ThemeStateService ThemeState
+@inject SaveThemeState saveTheme
+@inject IJSRuntime JSRuntime
+@inject Validation validation
+@using System.ComponentModel.DataAnnotations
+@using System.Text.RegularExpressions
+
+<PageTitle>User Settings</PageTitle>
+<br />
+
+<AuthorizeView>
+    <Authorized>
+        @if (IsLoadingPage)
+        {
+            <MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center">Loading...</MudText>
+
+        }
+        else if (IsValidUser)
+        {
+            <MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center">User Settings | @UserAccountName</MudText>
+            <br />
+
+            <MudPaper Height="100%" Width="100%">
+                <br />
+
+                <MudContainer MaxWidth="MaxWidth.Large">
+
+                    <MudSwitch @bind-Checked="@IsDarkmode" Label="@DarkLightModeText" Disabled="@IsDarkmodeToggleDisabled" Color="Color.Inherit" ThumbIcon="@(IsDarkmode==true ? Icons.Material.Filled.Nightlight : Icons.Material.Filled.WbSunny)" ThumbIconColor="@(IsDarkmode==true ? Color.Primary : Color.Dark)" />
+
+                    <br />
+                    <br />
+                    <MudDivider Style="height: 3px; border-radius: 3px; background-color: currentColor;"></MudDivider>
+                    <br />
+
+
+                    <MudText style="margin-left: 15px; font-size: 28px">Change Account Name</MudText>
+
+                    <div Style="width: 300px; margin-left: 15px">
+                        <MudTextField @bind-Value="NewUserAccountName" Label="@UserAccountName"
+                                      HelperText="Change your account name."
+                                      Variant="Variant.Text"
+                                      Immediate="true"
+                                      Error="@IsValidNameValidation"
+                                      ErrorText="@UserValueErrorValidationMessage"
+                                      TextChanged="UsernameTextChanged" />
+                    </div>
+
+
+
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Style="margin: 15px;" OnClick="@UpdateUserButton" Disabled="@DisableUpdateAccountNameButton">
+
+                        @if (_processingUsernameButton)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ms-2">Processing</MudText>
+                        }
+                        else
+                        {
+                            <MudText Class="ms-2">Update Account Name</MudText>
+                        }
+
+
+
+                    </MudButton>
+
+
+                    <br />
+                    <br />
+                    <MudDivider Style="height: 3px; border-radius: 3px; background-color: currentColor;"></MudDivider>
+
+                    <br />
+
+
+                    <MudText style="margin-left: 15px; font-size: 28px">@ChangeAddRemoveEmailText</MudText>
+
+                        <div Style="width: 300px; margin-left: 15px">
+                            <MudTextField @bind-Value="NewUserEmail" Label="@userEmailLabel"
+                                          HelperText="Update, add or remove your email."
+                                          Variant="Variant.Text"
+                                          Immediate="true"
+                                          Error="@IsValidEmailCheckValidation"
+                                          ErrorText="@EmailValueErrorMessage"
+                                          TextChanged="EmailTextChanged" />
+                        </div>
+
+
+
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" Style="margin: 15px;" OnClick="@UpdateUserMailButton" Disabled="@DisableUpdateUserEmailButton">
+                            @if (_processingEmailButton)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ms-2">Processing</MudText>
+                        }
+                        else
+                        {
+                            <MudText Class="ms-2">@UserEmailButtonText</MudText>
+                        }
+
+
+                    </MudButton>
+
+                    <br />
+                    <br />
+                </MudContainer>
+
+
+            </MudPaper>
+
+        }
+        else
+        {
+            <MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center" Color="Color.Warning">Access Denied - Not your accont.</MudText>
+        }
+
+
+
+
+
+
+    </Authorized>
+
+    <NotAuthorized>
+        <MudText Typo="Typo.h4" GutterBottom="true" Align="Align.Center" Color="Color.Warning">Access Denied - Not logged in.</MudText>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+    [Parameter]
+    public string UrlAccountName { get; set; } = string.Empty;
+    public string UserAccountName { get; set; } = string.Empty;
+    public string UserEmail { get; set; } = string.Empty;
+    public bool IsValidUser { get; set; }
+    public bool IsLoadingPage { get; set; }
+    public string DarkLightModeText { get; set; } = string.Empty;
+
+    public string NewUserAccountName { get; set; } = string.Empty;
+    public string UserValueErrorMessage { get; set; } = "Account name required.";
+    public bool IsValidName { get; set; } = false;
+    public bool IsValidNameValidation { get; set; }
+    public string UserValueErrorValidationMessage { get; set; } = string.Empty;
+    public bool DisableUpdateAccountNameButton { get; set; } = true;
+
+    public string NewUserEmail { get; set; } = string.Empty;
+    public string EmailValueErrorMessage { get; set; } = string.Empty;
+    public bool IsValidEmailCheck { get; set; } = false;
+    public bool IsValidEmailCheckValidation { get; set; } = false;
+    public bool DisableUpdateUserEmailButton { get; set; } = false;
+    public bool NoEmail { get; set; }
+    public string userEmailLabel { get; set; } = string.Empty;
+    public string UserEmailButtonText { get; set; } = string.Empty;
+    public string ChangeAddRemoveEmailText { get; set; } = "Blah";
+    public string EmailValueErrorValidationMessage { get; set; } = string.Empty;
+
+    private bool _processingEmailButton { get; set; }
+    private bool _processingUsernameButton { get; set; }
+
+    private bool IsDarkmodeToggleDisabled { get; set; } = false;
+
+    private bool _isDarkmode;
+    public bool IsDarkmode
+    {
+        get => _isDarkmode;
+        set
+        {
+            if (_isDarkmode != value)
+            {
+                _isDarkmode = value;
+                _ = SwitchDarkLightMode(value);
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsLoadingPage = true;
+        IsValidUser = false;
+        await RefreshUserData();
+        UpdateUserEmailButtonText();
+        IsLoadingPage = false;
+        IsDarkmodeToggleDisabled = false;
+
+        if (string.IsNullOrEmpty(UserEmail))
+        {
+            ChangeAddRemoveEmailText = "Add Email";
+        }
+        else
+        {
+            ChangeAddRemoveEmailText = "Change or Remove Email";
+        }
+
+    }
+
+    private void UpdateUserEmailButtonText()
+    {
+
+        if (string.IsNullOrEmpty(UserEmail))
+        {
+            UserEmailButtonText = "Add Email Address";
+
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(NewUserEmail))
+            {
+                UserEmailButtonText = "Remove Email Address";
+            }
+            else
+            {
+                UserEmailButtonText = "Change Email Address";
+            }
+        }
+
+    }
+
+    private void IsLoadingPageFunc(bool isLoading)
+    {
+
+    }
+
+    private async Task UpdateUserButton()
+    {
+        DisableUpdateAccountNameButton = true;
+        _processingUsernameButton = true;
+        await Task.Delay(1000);
+        await Task.Run(() =>
+         {
+
+             if (IsValidName == false) { return; }
+             if (userList.Users.Any(user => user.Account_name.Equals(NewUserAccountName, StringComparison.OrdinalIgnoreCase)))
+             {
+                 UserValueErrorMessage = "Account name already taken!";
+                 IsValidName = false;
+                 IsValidNameValidation = !IsValidName;
+
+                 UserValueErrorValidationMessage = "Account name already taken!";
+                 return;
+             }
+         });
+
+        if (IsValidName)
+        {
+            if (userAccount.User_id is null)
+            {
+                Console.WriteLine("userAccount.User_id is null");
+                return;
+            }
+            if (!validation.IsValidUsername(NewUserAccountName))
+            {
+                Console.WriteLine("validation of username failed");
+                return;
+            }
+
+            await fetchUserData.UpdateUsername(userAccount.User_id, NewUserAccountName);
+
+            NavigationManager.NavigateTo($"/settings/user/{NewUserAccountName}");
+            await RefreshUserData();
+            await JSRuntime.InvokeVoidAsync("location.reload");
+        }
+
+        DisableUpdateAccountNameButton = false;
+        _processingUsernameButton = false;
+
+    }
+
+    private async Task UpdateUserMailButton()
+    {
+        _processingEmailButton = true;
+        DisableUpdateUserEmailButton = true;
+        await Task.Delay(1000);
+
+        await Task.Run(() =>
+         {
+             if (string.IsNullOrEmpty(NewUserEmail))
+             {
+                 IsValidEmailCheck = true;
+             }
+             else
+             {
+                 if (IsValidEmailCheck == false)
+                 {
+                     Console.WriteLine("1");
+                     return;
+                 }
+
+
+                 if (userList.Users.Any(user => user.Email != null && user.Email.Equals(NewUserEmail, StringComparison.OrdinalIgnoreCase)))
+                 {
+
+                     EmailValueErrorMessage = "Email already exist!";
+                     IsValidEmailCheck = false;
+                     IsValidEmailCheckValidation = true;
+                     Console.WriteLine("2");
+                     return;
+                 }
+                 else
+                 {
+
+                 }
+             }
+
+
+         });
+
+
+
+
+        if (IsValidEmailCheck)
+        {
+            if (userAccount.User_id is null)
+            {
+                Console.WriteLine("userAccount.User_id is null");
+                return;
+            }
+            if (!validation.IsValidEmail(NewUserEmail))
+            {
+                Console.WriteLine("validation of email failed");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(NewUserEmail))
+            {
+                if (userAccount.User_id is null) { return; }
+                await fetchUserData.UpdateUserEmail(userAccount.User_id, null);
+
+            }
+            else
+            {
+                await fetchUserData.UpdateUserEmail(userAccount.User_id, NewUserEmail);
+            }
+
+
+
+            await RefreshUserData();
+            await JSRuntime.InvokeVoidAsync("location.reload");
+        }
+
+        _processingEmailButton = false;
+        DisableUpdateUserEmailButton = false;
+
+    }
+
+    private async Task UsernameTextChanged(string newValue)
+    {
+        await Task.Run(() =>
+        {
+            NewUserAccountName = newValue.Trim();
+            IsValidName = validation.IsValidUsername(NewUserAccountName);
+            if (string.IsNullOrEmpty(newValue))
+            {
+                IsValidNameValidation = false;
+            }
+            else
+            {
+                IsValidNameValidation = !IsValidName;
+                if (newValue.Length < 3 || newValue.Length > 20)
+                {
+                    UserValueErrorValidationMessage = "Must be between 3 and 20 characters long.";
+                }
+                else
+                {
+                    UserValueErrorValidationMessage = "No special characters allowed.";
+                }
+            }
+
+
+            if (!IsValidName)
+            {
+                UserValueErrorMessage = "Account name is Invalid. (Between 3 and 20 characters, no special characters.)";
+                DisableUpdateAccountNameButton = true;
+            }
+            else
+            {
+                DisableUpdateAccountNameButton = false;
+            }
+        });
+
+    }
+
+    private async Task EmailTextChanged(string newValue)
+    {
+        UpdateUserEmailButtonText();
+        await Task.Run(() =>
+        {
+            if (string.IsNullOrWhiteSpace(newValue))
+            {
+                NoEmail = true;
+                NewUserEmail = string.Empty;
+                if (userAccount.Email is null)
+                {
+                    DisableUpdateUserEmailButton = true;
+                }
+                else
+                {
+                    DisableUpdateUserEmailButton = false;
+                }
+
+            }
+            else
+            {
+                NoEmail = false;
+                NewUserEmail = newValue;
+                IsValidEmailCheck = validation.IsValidEmail(NewUserEmail);
+                if (!IsValidEmailCheck)
+                {
+                    EmailValueErrorMessage = "Email address is not valid.";
+                    EmailValueErrorValidationMessage = "Email address is not valid.";
+
+                    DisableUpdateUserEmailButton = true;
+                }
+                else
+                {
+
+                    DisableUpdateUserEmailButton = false;
+                    EmailValueErrorValidationMessage = "Email is valid.";
+                }
+                IsValidEmailCheckValidation = !IsValidEmailCheck;
+            }
+
+
+        });
+
+    }
+
+
+    private async Task RefreshUserData()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity is null) { return; }
+
+        if (user.Identity.IsAuthenticated)
+        {
+            string? authID = user.FindFirst(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))!.Value;
+
+            if (authID is not null)
+            {
+                await fetchUserData.FetchUser(authID);
+
+                if (userAccount.Account_name is not null)
+                {
+                    UserAccountName = userAccount.Account_name;
+
+                    IsDarkmode = userAccount.IsDarkMode;
+                    if (userAccount.Email is not null)
+                    {
+                        UserEmail = userAccount.Email;
+                    }
+
+                    if (IsDarkmode)
+                    {
+                        DarkLightModeText = "Switch to Light Mode";
+                    }
+                    else
+                    {
+                        DarkLightModeText = "Switch to Dark Mode";
+                    }
+
+                    if (string.IsNullOrWhiteSpace(userAccount.Email))
+                    {
+                        userEmailLabel = "mail@example.com";
+
+                    }
+                    else
+                    {
+                        userEmailLabel = userAccount.Email;
+                    }
+
+                    if (UserAccountName == UrlAccountName)
+                    {
+                        IsValidUser = true;
+
+                    }
+                }
+            }
+
+        }
+    }
+
+    private async Task SwitchDarkLightMode(bool newValue)
+    {
+       
+             if (IsDarkmodeToggleDisabled)
+             {
+                 IsDarkmode = !newValue;
+                 return;
+             }
+             IsDarkmodeToggleDisabled = true;
+             IsDarkmode = newValue;
+             ThemeState.IsDarkMode = IsDarkmode;
+
+
+             if (IsDarkmode)
+             {
+                 DarkLightModeText = "Switch to Light Mode";
+             }
+             else
+             {
+                 DarkLightModeText = "Switch to Dark Mode";
+             }
+        
+
+        await saveTheme.Save(userAccount.User_id!, newValue);
+
+
+
+
+        await Task.Delay(500);
+        IsDarkmodeToggleDisabled = false;
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/settings/user/{UrlAccountName}");
+
+
+    }
+}

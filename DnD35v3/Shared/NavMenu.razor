@@ -1,0 +1,77 @@
+﻿@inject UserAccount userAccount
+@inject FetchUserData fetchUserData
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavManager
+
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="fab fa-fort-awesome">Home</MudNavLink>
+    <AuthorizeView>
+        <Authorized>
+            @if(IsAccountCompleted)
+            {
+                <MudNavLink Href="@settingsPage" Match="NavLinkMatch.Prefix" Icon="fas fa-wrench">Settings</MudNavLink>
+                <MudNavGroup Title="Groups" Expanded="true" Icon="fas fa-dungeon">
+                    <MudNavLink Href="/groups/mygroups" Match="NavLinkMatch.All" Icon="fas fa-dice-d20">My Groups</MudNavLink>
+                    <MudNavLink Href="/groups/find" Match="NavLinkMatch.All" Icon="fas fa-magnifying-glass">Find Group</MudNavLink>
+                    <MudNavLink Href="/groups/create" Match="NavLinkMatch.All" Icon="fas fa-plus">Create Group</MudNavLink>
+               </MudNavGroup>
+         
+               <br />
+
+                <MudNavLink Href="/about" Match="NavLinkMatch.All" Icon="fas fa-question">About</MudNavLink>
+
+    
+            }
+        
+        </Authorized>
+    </AuthorizeView>
+ 
+</MudNavMenu>
+
+@code {
+    [Parameter]
+    public string UserAccountName { get; set; } = string.Empty;
+    public string settingsPage { get; set; } = "/";
+    public bool IsAccountCompleted { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsAccountCompleted = false;
+        await RefreshUserData();
+
+    }
+
+    private async Task RefreshUserData()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if(user.Identity is null) { return; }
+
+        if (user.Identity.IsAuthenticated)
+        {
+            string? authID = user.FindFirst(c => c.Type.Equals("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))!.Value;
+
+            if(authID is not null)
+            {
+                await fetchUserData.FetchUser(authID);
+            }
+
+
+
+            if (!string.IsNullOrWhiteSpace(userAccount.Account_name))
+            {
+                IsAccountCompleted = true;
+                UserAccountName = userAccount.Account_name;
+                settingsPage = $"/settings/user/{UserAccountName}";
+            }
+
+        }
+    }
+
+    public void UserSettingsClick()
+    {
+        NavManager.NavigateTo("/settings/user/" + UserAccountName);
+    }
+}

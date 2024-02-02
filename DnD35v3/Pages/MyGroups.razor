@@ -1,0 +1,184 @@
+﻿@page "/groups/mygroups"
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserAccount userAccount
+@inject FetchUserData fetchUserData
+@inject Validation validation
+@inject GroupHandler groupHandler
+@inject NavigationManager navigationManager
+@inject FetchUserList userList
+
+<br/>
+<br/>
+<MudText Typo="Typo.h4" Align="Align.Center">My Groups</MudText>
+<br />
+<br />
+<MudPaper Height="100%" Width="100%">
+    <br />
+    <MudContainer>
+
+        <AuthorizeView>
+
+          <NotAuthorized>
+<MudText Typo="Typo.h4" Align="Align.Center">Please login to view this page.</MudText>
+          </NotAuthorized>
+
+            <Authorized>
+                <MudStack Spacing="10">
+                  
+      
+                @foreach (var group in groupHandler.DungeonGroups.Where(g => groupHandler.DungeonTracker.Any(dt => dt.Dungeon_ID == g.ID && dt.User_ID == userAccount.ID)))
+                {
+                        <MudCard Elevation="24">
+
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudGrid>
+                                        <MudItem>
+                                            <MudText Typo="Typo.h6">@group.Group_name</MudText>
+                                        </MudItem>
+                                        <MudSpacer />
+                                        <MudItem>
+                                            <MudText>Created @group.Created_date.ToString("yyyy-MM-dd")</MudText>
+                                        </MudItem>
+
+                                    </MudGrid>
+
+
+
+
+                                </CardHeaderContent>
+
+                            </MudCardHeader>
+
+                            <MudCardContent>
+                                <MudGrid Spacing="3" Justify="Justify.FlexStart">
+                                    <MudItem>
+                                        @if(group.Picture != null && !group.Picture.EndsWith("gif"))
+										{
+                                            <div class="d-flex justify-center">
+                                                <MudImage ObjectFit="ObjectFit.Contain" Height="140" Width="140" Src="@group.Picture" Elevation="25" Class="rounded-lg" />
+                                            </div>
+                                      
+										}
+										else
+										{
+											<MudPaper Height="140px" Width="140px" />
+										}
+                                       <br />
+                                    
+
+                                    </MudItem>
+                                   
+                                    <MudItem>
+                                            <MudText><b>Owner</b> </MudText>
+                                            <MudText>@GetGroupOwnerName(group.Group_owner)</MudText>
+
+                                            <br />
+                                            <MudText><b>Members</b> </MudText>
+                                            <MudText>@group.Member_count</MudText>
+                                    </MudItem>
+
+
+
+                                </MudGrid>
+                                <br />
+                                <MudGrid>
+                                    <MudItem>
+                                            @if (!string.IsNullOrEmpty(group.Description))
+                                        {
+                                            <MudButton OnClick="() => OnExpandCollapseClick(group.ID)" Variant="Variant.Outlined">@((IsGroupExpanded(group.ID) ? new MarkupString("<b>Hide Group Description</b>") : new MarkupString("<b>Show Group Description</b>")))</MudButton>
+
+                                        }
+
+                                    </MudItem>
+                                    <MudDivider />
+                                    <MudItem></MudItem>
+                                </MudGrid>
+
+
+
+                                    <MudCollapse Expanded="@IsGroupExpanded(group.ID)">
+                                        @if (string.IsNullOrEmpty(group.Description))
+                                    {
+                                        <MudText>No Description...</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudText>@group.Description</MudText>
+                                    }
+                                </MudCollapse>
+
+
+                            </MudCardContent>
+
+                            <MudCardActions>
+                                <MudGrid>
+                                    <MudSpacer />
+                                    <MudItem>
+                                        @if (groupHandler.DungeonTracker.First(dt => dt.Dungeon_ID == group.ID && dt.User_ID == userAccount.ID).Is_accepted)
+                                        {
+                                            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="() => GoToGroup(group.Group_name)">ENTER GROUP</MudButton>
+                                        }
+                                        else
+                                        {
+                                            <MudText Color="Color.Info">Waiting for approval</MudText>
+                                        }
+                                    </MudItem>
+                                
+                                </MudGrid>
+                            </MudCardActions>
+
+                        </MudCard>
+                }
+
+                </MudStack>
+             
+            </Authorized>
+        </AuthorizeView>
+
+       
+        <br/>
+    </MudContainer>
+
+
+</MudPaper>
+<br />
+<br />
+
+@code {
+    Dictionary<int, bool> expandedStates = new Dictionary<int, bool>();
+
+    private void OnExpandCollapseClick(int groupId)
+    {
+        if (expandedStates.ContainsKey(groupId))
+        {
+            expandedStates[groupId] = !expandedStates[groupId];
+        }
+        else
+        {
+            expandedStates.Add(groupId, true);
+        }
+    }
+
+    private void GoToGroup(string groupName)
+	{
+        navigationManager.NavigateTo($"/group/{groupName}");
+	}
+
+    private bool IsGroupExpanded(int groupId)
+    {
+        return expandedStates.ContainsKey(groupId) ? expandedStates[groupId] : false;
+    }
+
+    private string GetGroupOwnerName(int ownerId)
+    {
+        var owner = userList.Users.FirstOrDefault(u => u.ID == ownerId);
+        if(owner == null)
+		{
+			return "Could not find owner.";
+		} else {
+            return owner.Account_name;
+        }
+       
+    }
+}
